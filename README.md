@@ -1,4 +1,5 @@
-Implementation of the single programming project of Stanford's Advanced Topics in Operating Systems course. <br /> 
+Implementation of the single programming project of Stanford's Advanced Topics in Operating Systems course. <br />
+
 http://web.stanford.edu/class/cs240/lab1.html
 <br />
 
