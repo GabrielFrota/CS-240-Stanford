@@ -45,6 +45,7 @@ struct Thread {
   static std::atomic<uint64_t> next_id;
 
   uint64_t id;
+  uint64_t initial_tid ;
   State state;
   Context context;
   uint8_t* stack;
