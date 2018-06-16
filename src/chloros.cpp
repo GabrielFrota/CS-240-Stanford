@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include "common.h"
+#include "semaphore.h"
 
 extern "C"
 {
@@ -143,20 +144,12 @@ void Spawn(Function fn, void* arg)
 	Yield(true) ;
 }
 
-bool Yield(bool only_ready)
+std::vector<std::unique_ptr<Thread>>::iterator
+	find_next_thread_to_run(bool only_ready)
 {
-	// FIXME: Phase 3
-	// Find a thread to yield to. If `only_ready` is true, only consider threads
-	// in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
-	// never schedule initial thread onto other kernel threads (for extra credit
-	// phase)!
-
-	bool terminating_initial_thread = false ;
 	std::vector<std::unique_ptr<Thread>>::iterator it ;
 
-	chloros::queue_lock.lock() ;
-loop_start:
-	if (!terminating_initial_thread)
+	if (current_thread->id == initial_thread_id)
 	{
 		for (it = chloros::thread_queue.begin() ;
 			 it != chloros::thread_queue.end() ;
@@ -196,6 +189,20 @@ loop_start:
 			}
 		}
 	}
+	return it ;
+}
+
+bool Yield(bool only_ready)
+{
+	// FIXME: Phase 3
+	// Find a thread to yield to. If `only_ready` is true, only consider threads
+	// in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
+	// never schedule initial thread onto other kernel threads (for extra credit
+	// phase)!
+
+	chloros::queue_lock.lock() ;
+	std::vector<std::unique_ptr<Thread>>::iterator it
+		= find_next_thread_to_run(only_ready) ;
 
 	if (it != chloros::thread_queue.end())
 	{
@@ -205,35 +212,21 @@ loop_start:
 
 		if (prev_thread->state == Thread::State::kRunning)
 			prev_thread->state = Thread::State::kReady ;
-		Context *prevCon = &prev_thread->context ;
+		Context *prev_context = &prev_thread->context ;
 		chloros::thread_queue.push_back(std::move(prev_thread)) ;
-		chloros::queue_lock.unlock() ;
 
 		next_thread->state = Thread::State::kRunning ;
 		current_thread = std::move(next_thread) ;
-		ContextSwitch(prevCon, &(current_thread->context)) ;
+
+		ContextSwitch(prev_context, &(current_thread->context)) ;
 		GarbageCollect() ;
+		chloros::queue_lock.unlock() ;
 		return true ;
 	}
 	else
 	{
-		if (current_thread->state != Thread::State::kZombie)
-		{
-			chloros::queue_lock.unlock() ;
-			return false ;
-		}
-		else if (current_thread->state == Thread::State::kZombie
-					&& terminating_initial_thread == false)
-		{
-			terminating_initial_thread = true ;
-			goto loop_start ;
-		}
-		else if (current_thread->state == Thread::State::kZombie
-					&& terminating_initial_thread == true)
-		{
-			chloros::queue_lock.unlock() ;
-			return false ;
-		}
+		chloros::queue_lock.unlock() ;
+		return false ;
 	}
 	//Unreachable
 	ASSERT(false) ;
@@ -252,7 +245,6 @@ void GarbageCollect()
 {
 	// FIXME: Phase 4
 
-	chloros::queue_lock.lock() ;
 	for (std::vector<std::unique_ptr<Thread>>::iterator it = chloros::thread_queue.begin() ;
 		 it != chloros::thread_queue.end() ; )
 	{
@@ -261,7 +253,6 @@ void GarbageCollect()
 		else
 			it++ ;
 	}
-	chloros::queue_lock.unlock() ;
 }
 
 std::pair<int, int> GetThreadCount()
@@ -287,6 +278,7 @@ std::pair<int, int> GetThreadCount()
 
 void ThreadEntry(Function fn, void* arg)
 {
+	chloros::queue_lock.unlock() ;
 	fn(arg) ;
 	current_thread->state = Thread::State::kZombie ;
 	// A thread that is spawn will always die yielding control to other threads.

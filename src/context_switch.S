@@ -13,11 +13,13 @@
 .globl context_switch
 .align 16
 context_switch:
+
   /* FIXME: Phase 2
    * Save and restore execution context.
    * Part of the code is provided.
    */
-  movq    %rsp, 0(%rdi)
+
+  movq    %rsp, (%rdi)
   movq    %r15, 8(%rdi)
   movq    %r14, 16(%rdi)
   movq    %r13, 24(%rdi)
@@ -27,7 +29,7 @@ context_switch:
   stmxcsr 0x38(%rdi)
   fnstcw  0x3C(%rdi)
 
-  movq    0(%rsi), %rsp
+  movq    (%rsi), %rsp
   movq    8(%rsi), %r15
   movq    16(%rsi), %r14
   movq    24(%rsi), %r13
@@ -37,7 +39,7 @@ context_switch:
   ldmxcsr 0x38(%rsi)
   fldcw   0x3C(%rsi)
 
-  ret
+  retq
 
 /**
  * Initial function implicitly executed by a thread.
