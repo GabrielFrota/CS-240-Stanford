@@ -14,9 +14,9 @@
 .align 16
 context_switch:
 
-  /* FIXME: Phase 2
+  /*
+   * FIXME: Phase 2
    * Save and restore execution context.
-   * Part of the code is provided.
    */
 
   movq    %rsp, (%rdi)
